@@ -1,0 +1,13 @@
+version: '3.8'
+
+services:
+  webserver_new:
+    image: nginx:alpine
+    container_name: webserver_new
+    restart: unless-stopped
+    tty: true
+    ports:
+      - "8001:80"
+    volumes:
+      - ./:/var/www
+      - ./.docker/nginx:/etc/nginx/conf.d/

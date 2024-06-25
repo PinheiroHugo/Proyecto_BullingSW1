@@ -1,0 +1,78 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: .docker/php/Dockerfile
+    image: my-laravel-app:latest
+    container_name: app
+    restart: always
+    tty: true
+    environment:
+      SERVICE_NAME: app
+      SERVICE_TAGS: dev
+    working_dir: /var/www
+    volumes:
+      - ./:/var/www
+    networks:
+      - app-network
+    depends_on:
+      - db
+    command: sh -c "/usr/bin/wait-for-it.sh db:3306 --timeout=60 --strict && php artisan serve --host=0.0.0.0 --port=8000"
+
+  webserver:
+    image: nginx:alpine
+    container_name: webserver
+    restart: always
+    tty: true
+    ports:
+      - "8000:80"
+    volumes:
+      - ./:/var/www
+      - ./.docker/nginx:/etc/nginx/conf.d/
+    networks:
+      - app-network
+    depends_on:
+      - app
+
+  db:
+    image: mysql:5.7.22
+    container_name: db
+    restart: always
+    tty: true
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_DATABASE: acoso
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_PASSWORD: root
+    volumes:
+      - dbdata:/var/lib/mysql/
+    networks:
+      - app-network
+
+  migrate:
+    build:
+      context: .
+      dockerfile: .docker/php/Dockerfile
+    image: my-laravel-app:latest
+    container_name: migrate
+    depends_on:
+      - db
+    volumes:
+      - ./:/var/www
+    working_dir: /var/www
+    entrypoint: sh -c "/usr/bin/wait-for-it.sh db:3306 --timeout=60 --strict && php artisan migrate --force && php artisan db:seed --force"
+    networks:
+      - app-network
+    environment:
+      DB_HOST: db
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  dbdata:
+    driver: local
